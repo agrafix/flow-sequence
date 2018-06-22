@@ -13,16 +13,17 @@ export function chain<T>(): Chain<T, T> {
     return new OpChain(idOp);
 }
 
-export function apply<T, R>(inArray: $ReadOnlyArray<T>, op: Operation<T, R>): Array<R> {
+function apply<T, R>(inArray: $ReadOnlyArray<T>, op: Operation<T, R>): Array<R> {
     let out = [];
-    for (let i = 0; i < inArray.length; i++) {
+    const inLength = inArray.length;
+    for (let i = 0; i < inLength; i++) {
         const el = inArray[i];
         const result = op(el);
-        if (result.keep) {
+        if (result.keep !== undefined) {
             out.push(result.keep);
-        } else if (result.many) {
+        } else if (result.many !== undefined) {
             out.push(...result.many);
-        } else if (result.abort) {
+        } else if (result.abort === true) {
             break;
         }
     }
@@ -34,9 +35,9 @@ function combine<T, R, S>(left: Operation<T, R>, right: Operation<R, S>): Operat
         const result = left(element);
         if (result.remove || result.abort) {
             return result;
-        } else if (result.keep) {
+        } else if (result.keep !== undefined) {
             return right(result.keep)
-        } else if (result.many) {
+        } else if (result.many !== undefined) {
             return {many: apply(result.many, right)};
         } else {
             throw new Error("Oops");
@@ -59,7 +60,7 @@ class OpChain<T, R> {
         return apply(inArray, this.pendingOperation);
     }
 
-    reduce<S>(inArray: $ReadOnlyArray<T>, initAccum: S, reduction: (accum: S, element: R) => S): S {
+    runReduce<S>(inArray: $ReadOnlyArray<T>, initAccum: S, reduction: (accum: S, element: R) => S): S {
         let total = initAccum;
         const op: Operation<R, empty> = (e) => {
             total = reduction(total, e);
@@ -71,6 +72,16 @@ class OpChain<T, R> {
 
     map<S>(f: (element: R) => S): OpChain<T, S> {
         const op: Operation<R, S> = (e) => { return {keep: f(e)} };
+        return new OpChain(combine(this.pendingOperation, op));
+    }
+
+    statefulMap<S, U>(initAccum: S, f: (accum: S, element: R) => [S, U]): OpChain<T, U> {
+        let total = initAccum;
+        const op: Operation<R, U> = (e) => {
+            const out = f(total, e);
+            total = out[0];
+            return {keep: out[1]};
+        };
         return new OpChain(combine(this.pendingOperation, op));
     }
 

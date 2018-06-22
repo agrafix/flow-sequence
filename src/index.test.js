@@ -1,11 +1,16 @@
 // @flow
 
-import {chain, apply} from './index';
+import {chain} from './index';
 
 describe('primitives', () => {
     it('correctly maps', () => {
         const op = chain().map(x => x + 1);
         expect(op.run([1, 2, 3, 4])).toEqual([2, 3, 4, 5]);
+    });
+
+    it('correctly statefulMaps', () => {
+        const op = chain().statefulMap(0, (accum, x) => [accum + 1, accum + x]);
+        expect(op.run([0, 0, 0, 0])).toEqual([0, 1, 2, 3]);
     });
 
     it('correctly flatMaps', () => {
@@ -24,7 +29,7 @@ describe('primitives', () => {
     });
 
     it('correctly reduces', () => {
-        expect(chain().reduce([1, 2, 3], 0, (x, y) => x + y)).toEqual(1 + 2 + 3);
+        expect(chain().runReduce([1, 2, 3], 0, (x, y) => x + y)).toEqual(1 + 2 + 3);
     });
 });
 
@@ -36,6 +41,6 @@ describe('chaining works', () => {
 
     it('supports final reduction', () => {
         const op = chain().filter(x => x > 2).map(x => x + 1).flatMap(x => [x, x]);
-        expect(op.reduce([1, 2, 3, 4], 0, (x, y) => x + y)).toEqual(4 + 4 + 5 + 5);
+        expect(op.runReduce([1, 2, 3, 4], 0, (x, y) => x + y)).toEqual(4 + 4 + 5 + 5);
     });
 });
