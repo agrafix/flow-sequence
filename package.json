@@ -1,0 +1,12 @@
+{
+  "name": "flow-sequence",
+  "version": "0.1.0",
+  "description": "Efficient composable operations on list like things",
+  "main": "index.js",
+  "scripts": {
+      "flow": "flow",
+  },
+  "author": "Alexander Thiemann <mail@athiemann.net>",
+  "license": "MIT",
+  "private": false
+}
