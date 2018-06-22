@@ -2,6 +2,7 @@
 
 type OperationResult<T> =
     | {|keep: T|}
+    | {|many: Array<T> |}
     | {|abort: true|}
     | {|remove: true|};
 
@@ -14,6 +15,8 @@ function apply<T, R>(inArray: $ReadOnlyArray<T>, op: Operation<T, R>): Array<R> 
         const result = op(el);
         if (result.keep) {
             out.push(result.keep);
+        } else if (result.many) {
+            out.push(...result.many);
         } else if (result.abort) {
             break;
         }
@@ -26,8 +29,13 @@ function combine<T, R, S>(left: Operation<T, R>, right: Operation<R, S>): Operat
         const result = left(element);
         if (result.remove || result.abort) {
             return result;
+        } else if (result.keep) {
+            return right(result.keep)
+        } else if (result.many) {
+            return {many: apply(result.many, right)};
+        } else {
+            throw new Error("Oops");
         }
-        return right(result.keep);
     };
 }
 
@@ -47,14 +55,10 @@ class OpChain<T, R> {
         return new OpChain(combine(this.pendingOperation, op));
     }
 
-/*
-    sum(zero: R, add: (element1: R, element2: R) => R): OpChain<R, R> {
-        let state = zero;
-        const op: Operation<R, R> = (e) => {
-            state = add(state, e);
-        }
+    flatMap<S>(f: (element: R) => Array<S>): OpChain<T, S> {
+        const op: Operation<R, S> = (e) => { return {many: f(e)} };
+        return new OpChain(combine(this.pendingOperation, op));
     }
-*/
 
     first(): OpChain<T, R> {
         let output = false;
