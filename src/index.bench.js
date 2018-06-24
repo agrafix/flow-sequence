@@ -1,6 +1,7 @@
 // @flow
 import * as Benchmark from 'benchmark';
 import {chain} from './index';
+import {chain as interpreterChain} from './interpreter';
 
 type Suite = {
   add: (name: string, bench: () => void) => Suite,
@@ -16,6 +17,13 @@ const chainOfAction = chain()
   .map((x) => x + 1)
   .filter((x) => x > 4)
   .flatMap((x) => [x, x]);
+
+const chainOfAction2 = interpreterChain()
+  .filter((x) => x > 2)
+  .map((x) => x + 1)
+  .filter((x) => x > 4)
+  .flatMap((x) => [x, x])
+  .optimize();
 
 type Config = {arraySize: number, arrayValue: number, name: string};
 
@@ -50,6 +58,10 @@ configurations
     });
     s.add(cfg.name + ': flow sequence chaining', () => {
       const r = chainOfAction.run(inArray);
+      r.length;
+    });
+    s.add(cfg.name + ': flow sequence interpreter chaining', () => {
+      const r = chainOfAction2.run(inArray);
       r.length;
     });
     return s;

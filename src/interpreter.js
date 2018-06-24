@@ -1,5 +1,45 @@
 // @flow
 
+function idOp<I>(): Node<I, I> {
+  return new Map((x) => x);
+}
+
+export function chain<I>(): DSL<I, I> {
+  return new DSL(idOp());
+}
+
+class DSL<I, O> {
+  pipe: Node<I, O>;
+
+  constructor(pipe: Node<I, O>) {
+    this.pipe = pipe;
+  }
+
+  map<R>(map: (element: O) => R): DSL<I, R> {
+    return new DSL(new Combine(this.pipe, new Map(map)));
+  }
+
+  filter(filter: (element: O) => boolean): DSL<I, O> {
+    return new DSL(new Combine(this.pipe, new Filter(filter)));
+  }
+
+  flatMap<R>(map: (element: O) => Array<R>): DSL<I, R> {
+    return new DSL(new Combine(this.pipe, new FlatMap(map)));
+  }
+
+  optimize(): DSL<I, O> {
+    return new DSL(optimize(this.pipe));
+  }
+
+  debugPrint(): string {
+    return this.pipe.debugPrint();
+  }
+
+  run(inArray: $ReadOnlyArray<I>): Array<O> {
+    return execute(inArray, this.pipe);
+  }
+}
+
 type OperationResult<T> =
   | {|keep: T|}
   | {|many: Array<T>|}
@@ -12,9 +52,10 @@ const abortIteration = {abort: true};
 function execute<I, O>(inArray: $ReadOnlyArray<I>, node: Node<I, O>): Array<O> {
   const arrayLength = inArray.length;
   const outArray = [];
-  for (let i = 0; i < arrayLength - 1; i++) {
+  const compiled = node.compile();
+  for (let i = 0; i < arrayLength; i++) {
     const element = inArray[i];
-    const r = node.run(element);
+    const r = compiled(element);
     if (r.abort === true) {
       break;
     }
@@ -32,7 +73,8 @@ function execute<I, O>(inArray: $ReadOnlyArray<I>, node: Node<I, O>): Array<O> {
 }
 
 interface Node<I, O> {
-  run(element: I): OperationResult<O>;
+  compile(): (element: I) => OperationResult<O>;
+  debugPrint(): string;
 }
 
 class Combine<I, X, O> implements Node<I, O> {
@@ -40,24 +82,31 @@ class Combine<I, X, O> implements Node<I, O> {
   right: Node<X, O>;
 
   constructor(left: Node<I, X>, right: Node<X, O>) {
-    super();
     this.left = optimize(left);
     this.right = optimize(right);
   }
 
-  run(element: I): OperationResult<O> {
-    const r = this.left.run(element);
-    if (r.keep !== undefined) {
-      return this.right.run(r.keep);
-    } else if (r.abort !== undefined) {
-      return abortIteration;
-    } else if (r.remove !== undefined) {
-      return removeElement;
-    } else if (r.many !== undefined) {
-      return {many: execute(r.many, this.right)};
-    } else {
-      throw new Error('This should never happen :)');
-    }
+  debugPrint() {
+    return `Combine(${this.left.debugPrint()}, ${this.right.debugPrint()})`;
+  }
+
+  compile(): (element: I) => OperationResult<O> {
+    const left = this.left.compile();
+    const right = this.right.compile();
+    return (element) => {
+      const r = left(element);
+      if (r.keep !== undefined) {
+        return right(r.keep);
+      } else if (r.abort !== undefined) {
+        return abortIteration;
+      } else if (r.remove !== undefined) {
+        return removeElement;
+      } else if (r.many !== undefined) {
+        return {many: execute(r.many, this.right)};
+      } else {
+        throw new Error('This should never happen :)');
+      }
+    };
   }
 }
 
@@ -65,15 +114,20 @@ class Filter<I> implements Node<I, I> {
   filterFun: (element: I) => boolean;
 
   constructor(filter: (element: I) => boolean) {
-    super();
     this.filterFun = filter;
   }
 
-  run(element: I): OperationResult<I> {
-    if (this.filterFun(element)) {
-      return {keep: element};
-    }
-    return removeElement;
+  debugPrint() {
+    return 'Filter';
+  }
+
+  compile(): (element: I) => OperationResult<I> {
+    return (element) => {
+      if (this.filterFun(element)) {
+        return {keep: element};
+      }
+      return removeElement;
+    };
   }
 }
 
@@ -81,12 +135,39 @@ class Map<I, O> implements Node<I, O> {
   mapFun: (element: I) => O;
 
   constructor(map: (element: I) => O) {
-    super();
     this.mapFun = map;
   }
 
-  run(element: I): OperationResult<O> {
-    return {keep: this.mapFun(element)};
+  debugPrint() {
+    return 'Map';
+  }
+
+  compile(): (element: I) => OperationResult<O> {
+    return (element) => {
+      return {keep: this.mapFun(element)};
+    };
+  }
+}
+
+class FilterMap<I, O> implements Node<I, O> {
+  mapFun: (element: I) => void | O;
+
+  constructor(map: (element: I) => void | O) {
+    this.mapFun = map;
+  }
+
+  debugPrint() {
+    return 'FilterMap';
+  }
+
+  compile(): (element: I) => OperationResult<O> {
+    return (element) => {
+      const r = this.mapFun(element);
+      if (r === undefined) {
+        return removeElement;
+      }
+      return {keep: r};
+    };
   }
 }
 
@@ -94,12 +175,43 @@ class FlatMap<I, O> implements Node<I, O> {
   mapFun: (element: I) => Array<O>;
 
   constructor(map: (element: I) => Array<O>) {
-    super();
     this.mapFun = map;
   }
 
-  run(element: I): OperationResult<O> {
-    return {many: this.mapFun(element)};
+  debugPrint() {
+    return 'FlatMap';
+  }
+
+  compile(): (element: I) => OperationResult<O> {
+    return (element) => {
+      return {many: this.mapFun(element)};
+    };
+  }
+}
+
+class StatefulMap<I, S, O> implements Node<I, O> {
+  initialState: () => S;
+  reduceFun: (accum: S, element: I) => [S, O];
+
+  constructor(
+    initialState: () => S,
+    reduceFun: (accum: S, element: I) => [S, O],
+  ) {
+    this.initialState = initialState;
+    this.reduceFun = reduceFun;
+  }
+
+  debugPrint() {
+    return 'StatefulMap';
+  }
+
+  compile(): (element: I) => OperationResult<O> {
+    let state = this.initialState();
+    return (element) => {
+      const r = this.reduceFun(state, element);
+      state = r[0];
+      return {keep: r[1]};
+    };
   }
 }
 
@@ -120,6 +232,58 @@ function optimize<I, O>(node: Node<I, O>): Node<I, O> {
         right.mapFun(left.mapFun(x)),
       );
       return flatMap;
+    } else if (left instanceof Map && right instanceof Filter) {
+      const filterMap: Node<I, O> = new FilterMap((x: I) => {
+        const r = left.mapFun(x);
+        if (right.filterFun(r)) {
+          return r;
+        }
+        return undefined;
+      });
+      return filterMap;
+    } else if (left instanceof Filter && right instanceof Map) {
+      const filterMap: Node<I, O> = new FilterMap((x: I) => {
+        if (!left.filterFun(x)) {
+          return undefined;
+        }
+        return right.mapFun(x);
+      });
+      return filterMap;
+    } else if (left instanceof FilterMap && right instanceof Map) {
+      const filterMap: Node<I, O> = new FilterMap((x: I) => {
+        const result = left.mapFun(x);
+        if (result === undefined) {
+          return undefined;
+        }
+        return right.mapFun(result);
+      });
+      return filterMap;
+    } else if (left instanceof FilterMap && right instanceof Filter) {
+      const filterMap: Node<I, O> = new FilterMap((x: I) => {
+        const result = left.mapFun(x);
+        if (result === undefined || !right.filterFun(result)) {
+          return undefined;
+        }
+        return result;
+      });
+      return filterMap;
+    } else if (left instanceof Filter && right instanceof FilterMap) {
+      const filterMap: Node<I, O> = new FilterMap((x: I) => {
+        if (!left.filterFun(x)) {
+          return undefined;
+        }
+        return right.mapFun(x);
+      });
+      return filterMap;
+    } else if (left instanceof FilterMap && right instanceof FlatMap) {
+      const filterMap: Node<I, O> = new FlatMap((x: I) => {
+        const result = left.mapFun(x);
+        if (result === undefined) {
+          return [];
+        }
+        return right.mapFun(x);
+      });
+      return filterMap;
     } else {
       return node;
     }
