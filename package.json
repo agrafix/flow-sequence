@@ -4,10 +4,12 @@
   "description": "Efficient composable operations on list like things",
   "main": "index.js",
   "scripts": {
+    "all": "yarn prettier && yarn flow && yarn jest && yarn transpile && yarn bench",
     "flow": "flow",
     "jest": "jest --config jestconfig.json",
     "transpile": "babel ./src --out-dir ./dist/ --ignore '**/*.test.js'",
-    "bench": "yarn transpile && node dist/index.bench.js"
+    "bench": "yarn transpile && node dist/index.bench.js",
+    "prettier": "prettier --write src/**/*.js"
   },
   "author": "Alexander Thiemann <mail@athiemann.net>",
   "license": "MIT",
@@ -26,7 +28,8 @@
     "babel-preset-stage-2": "^6.24.1",
     "benchmark": "^2.1.4",
     "flow-bin": "^0.75.0",
-    "jest-cli": "^23.1.0"
+    "jest-cli": "^23.1.0",
+    "prettier": "^1.13.5"
   },
   "dependencies": {}
 }
