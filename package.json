@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "flow": "flow",
-    "jest": "jest --config jestconfig.json"
+    "jest": "jest --config jestconfig.json",
+    "transpile": "babel ./src --out-dir ./dist/ --ignore '**/*.test.js'",
+    "bench": "yarn transpile && node dist/index.bench.js"
   },
   "author": "Alexander Thiemann <mail@athiemann.net>",
   "license": "MIT",

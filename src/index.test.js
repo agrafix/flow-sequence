@@ -43,4 +43,12 @@ describe('chaining works', () => {
         const op = chain().filter(x => x > 2).map(x => x + 1).flatMap(x => [x, x]);
         expect(op.runReduce([1, 2, 3, 4], 0, (x, y) => x + y)).toEqual(4 + 4 + 5 + 5);
     });
+
+    it('returns the same result as a native implementation', () => {
+        const inputArray = [1, 2, 3, 4, 5, 6, 7, 8];
+        const native =
+            inputArray.filter(x => x > 2).map(x => x + 1).filter(x => x > 4).reduce((acc, x) => acc.concat([x, x]), []);
+        const chainOfAction = chain().filter(x => x > 2).map(x => x + 1).filter(x => x > 4).flatMap(x => [x, x]);
+        expect(chainOfAction.run(inputArray)).toEqual(native);
+    });
 });
