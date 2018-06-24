@@ -59,7 +59,7 @@ function execute<I, O>(inArray: $ReadOnlyArray<I>, node: Node<I, O>): Array<O> {
     if (r.abort === true) {
       break;
     }
-    if (r.remove === true) {
+    if (r.remove === true || (r.many && r.many.length === 0)) {
       continue;
     }
     if (r.keep !== undefined) {
@@ -99,7 +99,7 @@ class Combine<I, X, O> implements Node<I, O> {
         return right(r.keep);
       } else if (r.abort !== undefined) {
         return abortIteration;
-      } else if (r.remove !== undefined) {
+      } else if (r.remove !== undefined || (r.many && r.many.length === 0)) {
         return removeElement;
       } else if (r.many !== undefined) {
         return {many: execute(r.many, this.right)};
@@ -172,9 +172,9 @@ class FilterMap<I, O> implements Node<I, O> {
 }
 
 class FlatMap<I, O> implements Node<I, O> {
-  mapFun: (element: I) => Array<O>;
+  mapFun: (element: I) => void | Array<O>;
 
-  constructor(map: (element: I) => Array<O>) {
+  constructor(map: (element: I) => void | Array<O>) {
     this.mapFun = map;
   }
 
@@ -184,7 +184,11 @@ class FlatMap<I, O> implements Node<I, O> {
 
   compile(): (element: I) => OperationResult<O> {
     return (element) => {
-      return {many: this.mapFun(element)};
+      const r = this.mapFun(element);
+      if (r === undefined || r.length === 0) {
+        return removeElement;
+      }
+      return {many: r};
     };
   }
 }
@@ -279,7 +283,7 @@ function optimize<I, O>(node: Node<I, O>): Node<I, O> {
       const filterMap: Node<I, O> = new FlatMap((x: I) => {
         const result = left.mapFun(x);
         if (result === undefined) {
-          return [];
+          return undefined;
         }
         return right.mapFun(x);
       });

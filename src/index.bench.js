@@ -43,6 +43,16 @@ const configurations: $ReadOnlyArray<Config> = [
     arrayValue: 100,
     name: '10000 elements, no early failing',
   },
+  {
+    arraySize: 10000,
+    arrayValue: 2, // fails in first filter
+    name: '10000 elements, early failing',
+  },
+  {
+    arraySize: 10000,
+    arrayValue: 3, // fails in second filter
+    name: '10000 elements, midway failing',
+  },
 ];
 
 configurations
