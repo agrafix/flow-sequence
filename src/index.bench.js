@@ -1,7 +1,6 @@
 // @flow
 import * as Benchmark from 'benchmark'; // eslint-disable-line
 import {chain} from './index';
-import {chain as interpreterChain} from './interpreter';
 
 type Suite = {
   add: (name: string, bench: () => void) => Suite,
@@ -12,12 +11,6 @@ type Suite = {
 const suite: Suite = new Benchmark.Suite();
 
 const chainOfAction = chain()
-  .filter((x) => x > 2)
-  .map((x) => x + 1)
-  .filter((x) => x > 4)
-  .flatMap((x) => [x, x]);
-
-const chainOfAction2 = interpreterChain()
   .filter((x) => x > 2)
   .map((x) => x + 1)
   .filter((x) => x > 4)
@@ -67,10 +60,6 @@ configurations
     });
     s.add(`${cfg.name}: flow sequence chaining`, () => {
       const r = chainOfAction.run(inArray);
-      r.length; // eslint-disable-line
-    });
-    s.add(`${cfg.name}: flow sequence interpreter chaining`, () => {
-      const r = chainOfAction2.run(inArray);
       r.length; // eslint-disable-line
     });
     return s;

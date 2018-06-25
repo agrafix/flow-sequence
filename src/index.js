@@ -1,131 +1,364 @@
 // @flow
 
+function idOp<I>(): Node<I, I> {
+  return new Map((x) => x);
+}
+
+export function chain<I>(): DSL<I, I> {
+  return new DSL(idOp());
+}
+
+class DSL<I, O> {
+  pipe: Node<I, O>;
+
+  constructor(pipe: Node<I, O>) {
+    this.pipe = pipe;
+  }
+
+  map<R>(map: (element: O) => R): DSL<I, R> {
+    return this.merge(new DSL(new Map(map)));
+  }
+
+  filter(filter: (element: O) => boolean): DSL<I, O> {
+    return this.merge(new DSL(new Filter(filter)));
+  }
+
+  flatMap<R>(map: (element: O) => Array<R>): DSL<I, R> {
+    return this.merge(new DSL(new FlatMap(map)));
+  }
+
+  statefulMap<S, R>(
+    initialState: () => S,
+    reduceFun: (accum: S, element: O) => [S, R],
+  ): DSL<I, R> {
+    return this.merge(new DSL(new StatefulMap(initialState, reduceFun)));
+  }
+
+  take(n: number): DSL<I, O> {
+    return this.merge(new DSL(new Take(n)));
+  }
+
+  drop(n: number): DSL<I, O> {
+    return this.merge(new DSL(new Drop(n)));
+  }
+
+  merge<R>(otherChain: DSL<O, R>): DSL<I, R> {
+    return new DSL(new Combine(this.pipe, otherChain.pipe));
+  }
+
+  optimize(): DSL<I, O> {
+    return new DSL(optimize(this.pipe));
+  }
+
+  debugPrint(): string {
+    return this.pipe.debugPrint();
+  }
+
+  run(inArray: $ReadOnlyArray<I>): Array<O> {
+    return execute(inArray, this.pipe);
+  }
+}
+
 type OperationResult<T> =
   | {|keep: T|}
   | {|many: Array<T>|}
   | {|abort: true|}
   | {|remove: true|};
 
-export opaque type Operation<T, R> = (element: T) => OperationResult<R>;
-export type Chain<T, R> = OpChain<T, R>;
+const removeElement = {remove: true};
+const abortIteration = {abort: true};
 
-export function chain<T>(): Chain<T, T> {
-  return new OpChain(idOp);
-}
-
-function apply<T, R>(
-  inArray: $ReadOnlyArray<T>,
-  op: Operation<T, R>,
-): Array<R> {
-  const out = [];
-  const inLength = inArray.length;
-  for (let i = 0; i < inLength; i++) {
-    const el = inArray[i];
-    const result = op(el);
-    if (result.keep !== undefined) {
-      out.push(result.keep);
-    } else if (result.many !== undefined) {
-      out.push(...result.many);
-    } else if (result.abort === true) {
+function execute<I, O>(inArray: $ReadOnlyArray<I>, node: Node<I, O>): Array<O> {
+  const arrayLength = inArray.length;
+  const outArray = [];
+  const compiled = node.compile();
+  for (let i = 0; i < arrayLength; i++) {
+    const element = inArray[i];
+    const r = compiled(element);
+    if (r.abort === true) {
       break;
     }
-  }
-  return out;
-}
-
-function combine<T, R, S>(
-  left: Operation<T, R>,
-  right: Operation<R, S>,
-): Operation<T, S> {
-  return (element) => {
-    const result = left(element);
-    if (result.remove || result.abort) {
-      return result;
-    } else if (result.keep !== undefined) {
-      return right(result.keep);
-    } else if (result.many !== undefined) {
-      return {many: apply(result.many, right)};
-    } else {
-      throw new Error('Oops');
+    if (r.remove === true || (r.many && r.many.length === 0)) {
+      continue; // eslint-disable-line no-continue
     }
-  };
+    if (r.keep !== undefined) {
+      outArray.push(r.keep);
+    }
+    if (r.many !== undefined) {
+      outArray.push(...r.many);
+    }
+  }
+  return outArray;
 }
 
-function idOp<T>(e: T): OperationResult<T> {
-  return {keep: e};
+interface Node<I, O> {
+  compile(): (element: I) => OperationResult<O>;
+  debugPrint(): string;
 }
 
-class OpChain<T, R> {
-  pendingOperation: Operation<T, R>;
+class Combine<I, X, O> implements Node<I, O> {
+  left: Node<I, X>;
 
-  constructor(initOperation: Operation<T, R>) {
-    this.pendingOperation = initOperation;
+  right: Node<X, O>;
+
+  constructor(left: Node<I, X>, right: Node<X, O>) {
+    this.left = optimize(left);
+    this.right = optimize(right);
   }
 
-  run(inArray: $ReadOnlyArray<T>): Array<R> {
-    return apply(inArray, this.pendingOperation);
+  debugPrint() {
+    return `Combine(${this.left.debugPrint()}, ${this.right.debugPrint()})`;
   }
 
-  runReduce<S>(
-    inArray: $ReadOnlyArray<T>,
-    initAccum: S,
-    reduction: (accum: S, element: R) => S,
-  ): S {
-    let total = initAccum;
-    const op: Operation<R, empty> = (e) => {
-      total = reduction(total, e);
-      return {remove: true};
-    };
-    new OpChain(combine(this.pendingOperation, op)).run(inArray);
-    return total;
-  }
-
-  map<S>(f: (element: R) => S): OpChain<T, S> {
-    const op: Operation<R, S> = (e) => {
-      return {keep: f(e)};
-    };
-    return new OpChain(combine(this.pendingOperation, op));
-  }
-
-  statefulMap<S, U>(
-    initAccum: S,
-    f: (accum: S, element: R) => [S, U],
-  ): OpChain<T, U> {
-    let total = initAccum;
-    const op: Operation<R, U> = (e) => {
-      const out = f(total, e);
-      total = out[0];
-      return {keep: out[1]};
-    };
-    return new OpChain(combine(this.pendingOperation, op));
-  }
-
-  flatMap<S>(f: (element: R) => Array<S>): OpChain<T, S> {
-    const op: Operation<R, S> = (e) => {
-      return {many: f(e)};
-    };
-    return new OpChain(combine(this.pendingOperation, op));
-  }
-
-  first(): OpChain<T, R> {
-    let output = false;
-    const op: Operation<R, R> = (e) => {
-      if (!output) {
-        output = true;
-        return {keep: e};
+  compile(): (element: I) => OperationResult<O> {
+    const left = this.left.compile();
+    const right = this.right.compile();
+    return (element) => {
+      const r = left(element);
+      if (r.keep !== undefined) {
+        return right(r.keep);
+      } else if (r.abort !== undefined) {
+        return abortIteration;
+      } else if (r.remove !== undefined || (r.many && r.many.length === 0)) {
+        return removeElement;
+      } else if (r.many !== undefined) {
+        return {many: execute(r.many, this.right)};
+      } else {
+        throw new Error('This should never happen :)');
       }
-      return {abort: true};
     };
-    return new OpChain(combine(this.pendingOperation, op));
+  }
+}
+
+class Filter<I> implements Node<I, I> {
+  filterFun: (element: I) => boolean;
+
+  constructor(filter: (element: I) => boolean) {
+    this.filterFun = filter;
   }
 
-  filter(f: (element: R) => boolean): OpChain<T, R> {
-    const op: Operation<R, R> = (e) => {
-      if (f(e)) {
-        return {keep: e};
+  debugPrint() {
+    return 'Filter';
+  }
+
+  compile(): (element: I) => OperationResult<I> {
+    return (element) => {
+      if (this.filterFun(element)) {
+        return {keep: element};
       }
-      return {remove: true};
+      return removeElement;
     };
-    return new OpChain(combine(this.pendingOperation, op));
+  }
+}
+
+class Map<I, O> implements Node<I, O> {
+  mapFun: (element: I) => O;
+
+  constructor(map: (element: I) => O) {
+    this.mapFun = map;
+  }
+
+  debugPrint() {
+    return 'Map';
+  }
+
+  compile(): (element: I) => OperationResult<O> {
+    return (element) => {
+      return {keep: this.mapFun(element)};
+    };
+  }
+}
+
+class FilterMap<I, O> implements Node<I, O> {
+  mapFun: (element: I) => void | O;
+
+  constructor(map: (element: I) => void | O) {
+    this.mapFun = map;
+  }
+
+  debugPrint() {
+    return 'FilterMap';
+  }
+
+  compile(): (element: I) => OperationResult<O> {
+    return (element) => {
+      const r = this.mapFun(element);
+      if (r === undefined) {
+        return removeElement;
+      }
+      return {keep: r};
+    };
+  }
+}
+
+class FlatMap<I, O> implements Node<I, O> {
+  mapFun: (element: I) => void | Array<O>;
+
+  constructor(map: (element: I) => void | Array<O>) {
+    this.mapFun = map;
+  }
+
+  debugPrint() {
+    return 'FlatMap';
+  }
+
+  compile(): (element: I) => OperationResult<O> {
+    return (element) => {
+      const r = this.mapFun(element);
+      if (r === undefined || r.length === 0) {
+        return removeElement;
+      }
+      return {many: r};
+    };
+  }
+}
+
+class Take<I> implements Node<I, I> {
+  counter: number;
+
+  constructor(counter: number) {
+    this.counter = counter;
+  }
+
+  debugPrint() {
+    return `Take[${this.counter}]`;
+  }
+
+  compile(): (element: I) => OperationResult<I> {
+    let ptr = 0;
+    return (element) => {
+      if (ptr < this.counter) {
+        ptr++;
+        return {keep: element};
+      }
+      return abortIteration;
+    };
+  }
+}
+
+class Drop<I> implements Node<I, I> {
+  counter: number;
+
+  constructor(counter: number) {
+    this.counter = counter;
+  }
+
+  debugPrint() {
+    return `Drop[${this.counter}]`;
+  }
+
+  compile(): (element: I) => OperationResult<I> {
+    let ptr = 0;
+    return (element) => {
+      if (ptr < this.counter) {
+        ptr++;
+        return removeElement;
+      }
+      return {keep: element};
+    };
+  }
+}
+
+class StatefulMap<I, S, O> implements Node<I, O> {
+  initialState: () => S;
+
+  reduceFun: (accum: S, element: I) => [S, O];
+
+  constructor(
+    initialState: () => S,
+    reduceFun: (accum: S, element: I) => [S, O],
+  ) {
+    this.initialState = initialState;
+    this.reduceFun = reduceFun;
+  }
+
+  debugPrint() {
+    return 'StatefulMap';
+  }
+
+  compile(): (element: I) => OperationResult<O> {
+    let state = this.initialState();
+    return (element) => {
+      const r = this.reduceFun(state, element);
+      state = r[0];
+      return {keep: r[1]};
+    };
+  }
+}
+
+function optimize<I, O>(node: Node<I, O>): Node<I, O> {
+  if (node instanceof Combine) {
+    const left = optimize(node.left);
+    const right = optimize(node.right);
+    if (left instanceof Filter && right instanceof Filter) {
+      const filter: Node<I, I> = new Filter(
+        (x: I) => left.filterFun(x) && right.filterFun(x),
+      );
+      return (filter: any); // sad... but there's no way of teaching flow that I ~ O in filter case
+    } else if (left instanceof Map && right instanceof Map) {
+      const map: Node<I, O> = new Map((x: I) => right.mapFun(left.mapFun(x)));
+      return map;
+    } else if (left instanceof Map && right instanceof FlatMap) {
+      const flatMap: Node<I, O> = new FlatMap((x: I) =>
+        right.mapFun(left.mapFun(x)),
+      );
+      return flatMap;
+    } else if (left instanceof Map && right instanceof Filter) {
+      const filterMap: Node<I, O> = new FilterMap((x: I) => {
+        const r = left.mapFun(x);
+        if (right.filterFun(r)) {
+          return r;
+        }
+        return undefined;
+      });
+      return filterMap;
+    } else if (left instanceof Filter && right instanceof Map) {
+      const filterMap: Node<I, O> = new FilterMap((x: I) => {
+        if (!left.filterFun(x)) {
+          return undefined;
+        }
+        return right.mapFun(x);
+      });
+      return filterMap;
+    } else if (left instanceof FilterMap && right instanceof Map) {
+      const filterMap: Node<I, O> = new FilterMap((x: I) => {
+        const result = left.mapFun(x);
+        if (result === undefined) {
+          return undefined;
+        }
+        return right.mapFun(result);
+      });
+      return filterMap;
+    } else if (left instanceof FilterMap && right instanceof Filter) {
+      const filterMap: Node<I, O> = new FilterMap((x: I) => {
+        const result = left.mapFun(x);
+        if (result === undefined || !right.filterFun(result)) {
+          return undefined;
+        }
+        return result;
+      });
+      return filterMap;
+    } else if (left instanceof Filter && right instanceof FilterMap) {
+      const filterMap: Node<I, O> = new FilterMap((x: I) => {
+        if (!left.filterFun(x)) {
+          return undefined;
+        }
+        return right.mapFun(x);
+      });
+      return filterMap;
+    } else if (left instanceof FilterMap && right instanceof FlatMap) {
+      const filterMap: Node<I, O> = new FlatMap((x: I) => {
+        const result = left.mapFun(x);
+        if (result === undefined) {
+          return undefined;
+        }
+        return right.mapFun(result);
+      });
+      return filterMap;
+    } else {
+      return node;
+    }
+  } else {
+    return node;
   }
 }
