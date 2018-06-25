@@ -27,6 +27,14 @@ class DSL<I, O> {
     return this.merge(new DSL(new FlatMap(map)));
   }
 
+  take(n: number): DSL<I, O> {
+    return this.merge(new DSL(new Take(n)));
+  }
+
+  drop(n: number): DSL<I, O> {
+    return this.merge(new DSL(new Drop(n)));
+  }
+
   merge<R>(otherChain: DSL<O, R>): DSL<I, R> {
     return new DSL(new Combine(this.pipe, otherChain.pipe)).optimize();
   }
@@ -193,6 +201,52 @@ class FlatMap<I, O> implements Node<I, O> {
         return removeElement;
       }
       return {many: r};
+    };
+  }
+}
+
+class Take<I> implements Node<I, I> {
+  counter: number;
+
+  constructor(counter: number) {
+    this.counter = counter;
+  }
+
+  debugPrint() {
+    return `Take[${this.counter}]`;
+  }
+
+  compile(): (element: I) => OperationResult<I> {
+    let ptr = 0;
+    return (element) => {
+      if (ptr < this.counter) {
+        ptr++;
+        return {keep: element};
+      }
+      return abortIteration;
+    };
+  }
+}
+
+class Drop<I> implements Node<I, I> {
+  counter: number;
+
+  constructor(counter: number) {
+    this.counter = counter;
+  }
+
+  debugPrint() {
+    return `Drop[${this.counter}]`;
+  }
+
+  compile(): (element: I) => OperationResult<I> {
+    let ptr = 0;
+    return (element) => {
+      if (ptr < this.counter) {
+        ptr++;
+        return removeElement;
+      }
+      return {keep: element};
     };
   }
 }

@@ -8,6 +8,16 @@ describe('primitives', () => {
     expect(op.run([1, 2, 3, 4])).toEqual([2, 3, 4, 5]);
   });
 
+  it('correctly takes', () => {
+    const op = chain().take(2);
+    expect(op.run([1, 2, 3, 4])).toEqual([1, 2]);
+  });
+
+  it('correctly drops', () => {
+    const op = chain().drop(2);
+    expect(op.run([1, 2, 3, 4])).toEqual([3, 4]);
+  });
+
   it('correctly flatMaps', () => {
     const op = chain().flatMap((x) => [x, x + 1]);
     expect(op.run([1, 2, 3, 4])).toEqual([1, 2, 2, 3, 3, 4, 4, 5]);
