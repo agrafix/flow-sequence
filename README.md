@@ -1,11 +1,14 @@
 # flow-sequence
 
 An (experimental) attempt to allow chaining operations on `Array` without traversing the array
-multiple times.
+multiple times. In other words: A chain of actions on an array should always be `O(n)` where `n` is
+the number of elements in the array.
 
 In the given example all element should only be traversed once:
 
 ```javascript
+import {chain} from 'flow-sequence';
+
 const op = chain()
   .filter((x) => x > 2)
   .map((x) => x + 1)
