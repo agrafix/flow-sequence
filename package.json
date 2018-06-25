@@ -2,14 +2,17 @@
   "name": "flow-sequence",
   "version": "0.1.0",
   "description": "Efficient composable operations on list like things",
-  "main": "src/index.js",
+  "main": "index.js",
   "scripts": {
     "flow": "flow",
     "jest": "jest --config jestconfig.json",
-    "transpile": "babel ./src --out-dir ./dist/ --ignore '**/*.test.js'",
-    "bench": "yarn transpile && node dist/index.bench.js",
+    "transpile-package":
+      "babel ./src --out-dir ./dist-package/ --ignore '**/*.test.js','**/*.bench.js'",
+    "transpile-bench": "babel ./src --out-dir ./dist/ --ignore '**/*.test.js'",
+    "bench": "yarn transpile-bench && node dist/index.bench.js",
     "prettier": "prettier --write src/**/*.js",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "package": "./make-package.sh"
   },
   "author": "Alexander Thiemann <mail@athiemann.net>",
   "license": "MIT",
