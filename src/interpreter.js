@@ -16,15 +16,19 @@ class DSL<I, O> {
   }
 
   map<R>(map: (element: O) => R): DSL<I, R> {
-    return new DSL(new Combine(this.pipe, new Map(map)));
+    return this.merge(new DSL(new Map(map)));
   }
 
   filter(filter: (element: O) => boolean): DSL<I, O> {
-    return new DSL(new Combine(this.pipe, new Filter(filter)));
+    return this.merge(new DSL(new Filter(filter)));
   }
 
   flatMap<R>(map: (element: O) => Array<R>): DSL<I, R> {
-    return new DSL(new Combine(this.pipe, new FlatMap(map)));
+    return this.merge(new DSL(new FlatMap(map)));
+  }
+
+  merge<R>(otherChain: DSL<O, R>): DSL<I, R> {
+    return new DSL(new Combine(this.pipe, otherChain.pipe)).optimize();
   }
 
   optimize(): DSL<I, O> {
