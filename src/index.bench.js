@@ -1,5 +1,5 @@
 // @flow
-import * as Benchmark from 'benchmark';
+import * as Benchmark from 'benchmark'; // eslint-disable-line
 import {chain} from './index';
 import {chain as interpreterChain} from './interpreter';
 
@@ -11,7 +11,6 @@ type Suite = {
 
 const suite: Suite = new Benchmark.Suite();
 
-const inputArray = Array(100).fill(100);
 const chainOfAction = chain()
   .filter((x) => x > 2)
   .map((x) => x + 1)
@@ -58,25 +57,25 @@ const configurations: $ReadOnlyArray<Config> = [
 configurations
   .reduce((s, cfg: Config) => {
     const inArray = Array(cfg.arraySize).fill(cfg.arrayValue);
-    s.add(cfg.name + ': naive chaining', () => {
+    s.add(`${cfg.name}: naive chaining`, () => {
       const r = inArray
         .filter((x) => x > 2)
         .map((x) => x + 1)
         .filter((x) => x > 4)
         .reduce((acc, x) => acc.concat([x, x]), []);
-      r.length;
+      r.length; // eslint-disable-line
     });
-    s.add(cfg.name + ': flow sequence chaining', () => {
+    s.add(`${cfg.name}: flow sequence chaining`, () => {
       const r = chainOfAction.run(inArray);
-      r.length;
+      r.length; // eslint-disable-line
     });
-    s.add(cfg.name + ': flow sequence interpreter chaining', () => {
+    s.add(`${cfg.name}: flow sequence interpreter chaining`, () => {
       const r = chainOfAction2.run(inArray);
-      r.length;
+      r.length; // eslint-disable-line
     });
     return s;
   }, suite)
   .on('cycle', (event) => {
-    console.log(String(event.target));
+    console.log(String(event.target)); // eslint-disable-line
   })
   .run({async: true});

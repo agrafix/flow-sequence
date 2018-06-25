@@ -17,7 +17,7 @@ function apply<T, R>(
   inArray: $ReadOnlyArray<T>,
   op: Operation<T, R>,
 ): Array<R> {
-  let out = [];
+  const out = [];
   const inLength = inArray.length;
   for (let i = 0; i < inLength; i++) {
     const el = inArray[i];

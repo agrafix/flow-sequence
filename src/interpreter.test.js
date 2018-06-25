@@ -8,6 +8,17 @@ describe('primitives', () => {
     expect(op.run([1, 2, 3, 4])).toEqual([2, 3, 4, 5]);
   });
 
+  it('correctly stateful maps', () => {
+    const op = chain().statefulMap(
+      () => 0,
+      (accum, x) => [accum + 1, x + accum],
+    );
+    expect(op.run([1, 2, 3, 4])).toEqual([1, 3, 5, 7]);
+
+    // run again to make sure the initial state is correctly applied between runs
+    expect(op.run([1, 2, 3, 4])).toEqual([1, 3, 5, 7]);
+  });
+
   it('correctly takes', () => {
     const op = chain().take(2);
     expect(op.run([1, 2, 3, 4])).toEqual([1, 2]);
@@ -65,7 +76,7 @@ describe('optimization works', () => {
     expect(chainOfAction.debugPrint()).toBe('FlatMap');
   });
 
-  it.only('produces the correct result', () => {
+  it('produces the correct result', () => {
     const op = chain()
       .filter((x) => x > 2)
       .map((x) => x + 1)

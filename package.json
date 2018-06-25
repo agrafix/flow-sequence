@@ -4,13 +4,12 @@
   "description": "Efficient composable operations on list like things",
   "main": "src/index.js",
   "scripts": {
-    "all":
-      "yarn prettier && yarn flow && yarn jest && yarn transpile && yarn bench",
     "flow": "flow",
     "jest": "jest --config jestconfig.json",
     "transpile": "babel ./src --out-dir ./dist/ --ignore '**/*.test.js'",
     "bench": "yarn transpile && node dist/index.bench.js",
-    "prettier": "prettier --write src/**/*.js"
+    "prettier": "prettier --write src/**/*.js",
+    "lint": "eslint src"
   },
   "author": "Alexander Thiemann <mail@athiemann.net>",
   "license": "MIT",
@@ -28,6 +27,12 @@
     "babel-preset-flow": "^6.23.0",
     "babel-preset-stage-2": "^6.24.1",
     "benchmark": "^2.1.4",
+    "eslint": "^5.0.0",
+    "eslint-config-airbnb-base": "^13.0.0",
+    "eslint-config-prettier": "^2.9.0",
+    "eslint-plugin-flowtype": "^2.49.3",
+    "eslint-plugin-import": "^2.13.0",
+    "eslint-plugin-prettier": "^2.6.1",
     "flow-bin": "^0.75.0",
     "jest-cli": "^23.1.0",
     "prettier": "^1.13.5"

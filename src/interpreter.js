@@ -27,6 +27,13 @@ class DSL<I, O> {
     return this.merge(new DSL(new FlatMap(map)));
   }
 
+  statefulMap<S, R>(
+    initialState: () => S,
+    reduceFun: (accum: S, element: O) => [S, R],
+  ): DSL<I, R> {
+    return this.merge(new DSL(new StatefulMap(initialState, reduceFun)));
+  }
+
   take(n: number): DSL<I, O> {
     return this.merge(new DSL(new Take(n)));
   }
@@ -72,7 +79,7 @@ function execute<I, O>(inArray: $ReadOnlyArray<I>, node: Node<I, O>): Array<O> {
       break;
     }
     if (r.remove === true || (r.many && r.many.length === 0)) {
-      continue;
+      continue; // eslint-disable-line no-continue
     }
     if (r.keep !== undefined) {
       outArray.push(r.keep);
@@ -91,6 +98,7 @@ interface Node<I, O> {
 
 class Combine<I, X, O> implements Node<I, O> {
   left: Node<I, X>;
+
   right: Node<X, O>;
 
   constructor(left: Node<I, X>, right: Node<X, O>) {
@@ -253,6 +261,7 @@ class Drop<I> implements Node<I, I> {
 
 class StatefulMap<I, S, O> implements Node<I, O> {
   initialState: () => S;
+
   reduceFun: (accum: S, element: I) => [S, O];
 
   constructor(
