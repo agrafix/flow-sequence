@@ -36,7 +36,7 @@ class DSL<I, O> {
   }
 
   merge<R>(otherChain: DSL<O, R>): DSL<I, R> {
-    return new DSL(new Combine(this.pipe, otherChain.pipe)).optimize();
+    return new DSL(new Combine(this.pipe, otherChain.pipe));
   }
 
   optimize(): DSL<I, O> {
@@ -279,8 +279,8 @@ class StatefulMap<I, S, O> implements Node<I, O> {
 
 function optimize<I, O>(node: Node<I, O>): Node<I, O> {
   if (node instanceof Combine) {
-    const left: Node<I, I> = optimize(node.left);
-    const right: Node<I, I> = optimize(node.right);
+    const left = optimize(node.left);
+    const right = optimize(node.right);
     if (left instanceof Filter && right instanceof Filter) {
       const filter: Node<I, I> = new Filter(
         (x: I) => left.filterFun(x) && right.filterFun(x),
@@ -343,7 +343,7 @@ function optimize<I, O>(node: Node<I, O>): Node<I, O> {
         if (result === undefined) {
           return undefined;
         }
-        return right.mapFun(x);
+        return right.mapFun(result);
       });
       return filterMap;
     } else {

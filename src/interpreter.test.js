@@ -55,7 +55,7 @@ describe('chaining works', () => {
 });
 
 describe('optimization works', () => {
-  it('optimizes correctly', () => {
+  it('reduces chain of actions into a single FlatMap', () => {
     const chainOfAction = chain()
       .filter((x) => x > 2)
       .map((x) => x + 1)
@@ -63,5 +63,13 @@ describe('optimization works', () => {
       .flatMap((x) => [x, x])
       .optimize();
     expect(chainOfAction.debugPrint()).toBe('FlatMap');
+  });
+
+  it.only('produces the correct result', () => {
+    const op = chain()
+      .filter((x) => x > 2)
+      .map((x) => x + 1)
+      .flatMap((x) => [x, x]);
+    expect(op.optimize().run([1, 2, 3, 4])).toEqual(op.run([1, 2, 3, 4]));
   });
 });
