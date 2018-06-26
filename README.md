@@ -21,6 +21,10 @@ const op = chain()
 console.log(op.run[(1, 2, 3, 4, 5)]);
 ```
 
+## Install
+
+Get from npm via `npm install flow-sequence` or `yarn add flow-sequence`. Comes with flow types!
+
 ## Benchmarks
 
 ```
