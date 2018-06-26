@@ -18,7 +18,7 @@ const op = chain()
   .flatMap((x) => [x, x])
   .optimize();
 
-console.log(op.run[(1, 2, 3, 4, 5)]);
+console.log(op.run([1, 2, 3, 4, 5]));
 ```
 
 ## Install
