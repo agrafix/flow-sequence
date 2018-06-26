@@ -1,6 +1,6 @@
 # flow-sequence
 
-[![CircleCI](https://circleci.com/gh/agrafix/flow-sequence.svg?style=svg)](https://circleci.com/gh/agrafix/flow-sequence)
+[![CircleCI](https://circleci.com/gh/agrafix/flow-sequence.svg?style=svg)](https://circleci.com/gh/agrafix/flow-sequence) ![npm](https://img.shields.io/npm/dw/flow-sequence.svg)
 
 An (experimental) attempt to allow chaining operations on `Array` without traversing the array
 multiple times. In other words: A chain of actions on an array should always be `O(n)` where `n` is
