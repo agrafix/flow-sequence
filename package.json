@@ -12,7 +12,8 @@
     "bench": "yarn transpile-bench && node dist/index.bench.js",
     "prettier": "prettier --write src/**/*.js",
     "lint": "eslint src",
-    "package": "./make-package.sh"
+    "package": "./make-package.sh",
+    "pkg-check": "./pkg-check.sh"
   },
   "author": "Alexander Thiemann <mail@athiemann.net>",
   "license": "MIT",
